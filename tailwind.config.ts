@@ -1,3 +1,4 @@
+
 import type { Config } from "tailwindcss";
 
 export default {
@@ -61,7 +62,13 @@ export default {
 					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
-				}
+				},
+				// MoneyMind Custom Colors
+				'money-primary': '#9b87f5',
+				'money-secondary': '#7E69AB',
+				'money-dark': '#1A1F2C',
+				'money-gray': '#F1F0FB',
+				'money-red': '#ea384c',
 			},
 			borderRadius: {
 				lg: 'var(--radius)',
