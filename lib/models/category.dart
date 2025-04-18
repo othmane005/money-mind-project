@@ -35,7 +35,9 @@ class Category {
       id: json['id'],
       name: json['name'],
       icon: json['icon'],
-      color: Color(json['color']),
+      color: Color(json['color'] is String 
+          ? int.parse(json['color']) 
+          : json['color']),
       type: _getCategoryTypeFromString(json['type']),
     );
   }

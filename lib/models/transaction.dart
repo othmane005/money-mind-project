@@ -34,7 +34,9 @@ class Transaction {
   factory Transaction.fromJson(Map<String, dynamic> json) {
     return Transaction(
       id: json['id'],
-      amount: json['amount'].toDouble(),
+      amount: (json['amount'] is int) 
+          ? (json['amount'] as int).toDouble() 
+          : json['amount'].toDouble(),
       type: json['type'] == 'income' ? TransactionType.income : TransactionType.expense,
       categoryId: json['categoryId'],
       description: json['description'],

@@ -13,10 +13,14 @@ dependencies:
   flutter_localizations:
     sdk: flutter
   cupertino_icons: ^1.0.2
-  shared_preferences: ^2.2.0
   uuid: ^3.0.7
   intl: ^0.18.0
   fl_chart: ^0.63.0
+  
+  # Firebase packages
+  firebase_core: ^2.24.2
+  cloud_firestore: ^4.15.2
+  firebase_analytics: ^10.8.0
 
 dev_dependencies:
   flutter_test:

@@ -1,13 +1,15 @@
 
-import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
 import '../models/transaction.dart';
 import '../models/category.dart';
-import 'package:flutter/material.dart';
 
 class DataService {
-  static const String _transactionsKey = 'transactions';
-  static const String _categoriesKey = 'categories';
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  
+  // Collection references
+  CollectionReference get _transactionsCollection => _firestore.collection('transactions');
+  CollectionReference get _categoriesCollection => _firestore.collection('categories');
 
   // Initial categories
   static final List<Category> _initialCategories = [
@@ -107,89 +109,86 @@ class DataService {
     ),
   ];
 
-  // Get all transactions
-  Future<List<Transaction>> getTransactions() async {
-    final prefs = await SharedPreferences.getInstance();
-    final String? transactionsJson = prefs.getString(_transactionsKey);
-    
-    if (transactionsJson == null) {
-      // Save initial data if nothing exists
-      await saveData(_transactionsKey, _initialTransactions);
-      return _initialTransactions;
+  // Initialize Firestore with default data if empty
+  Future<void> initializeFirestoreData() async {
+    // Check if categories collection is empty
+    final categoriesSnapshot = await _categoriesCollection.get();
+    if (categoriesSnapshot.docs.isEmpty) {
+      // Add initial categories
+      for (var category in _initialCategories) {
+        await _categoriesCollection.doc(category.id).set(category.toJson());
+      }
     }
     
-    List<dynamic> decoded = jsonDecode(transactionsJson);
-    return decoded.map((item) => Transaction.fromJson(item)).toList();
+    // Check if transactions collection is empty
+    final transactionsSnapshot = await _transactionsCollection.get();
+    if (transactionsSnapshot.docs.isEmpty) {
+      // Add initial transactions
+      for (var transaction in _initialTransactions) {
+        await _transactionsCollection.doc(transaction.id).set(transaction.toJson());
+      }
+    }
+  }
+
+  // Get all transactions
+  Future<List<Transaction>> getTransactions() async {
+    await initializeFirestoreData();
+    
+    final snapshot = await _transactionsCollection.get();
+    return snapshot.docs.map((doc) => 
+      Transaction.fromJson(doc.data() as Map<String, dynamic>)
+    ).toList();
   }
 
   // Get all categories
   Future<List<Category>> getCategories() async {
-    final prefs = await SharedPreferences.getInstance();
-    final String? categoriesJson = prefs.getString(_categoriesKey);
+    await initializeFirestoreData();
     
-    if (categoriesJson == null) {
-      // Save initial data if nothing exists
-      await saveData(_categoriesKey, _initialCategories);
-      return _initialCategories;
-    }
-    
-    List<dynamic> decoded = jsonDecode(categoriesJson);
-    return decoded.map((item) => Category.fromJson(item)).toList();
-  }
-
-  // Generic save data method
-  Future<void> saveData<T>(String key, List<T> data) async {
-    final prefs = await SharedPreferences.getInstance();
-    final String encodedData = jsonEncode(
-      data.map((item) => (item as dynamic).toJson()).toList()
-    );
-    await prefs.setString(key, encodedData);
+    final snapshot = await _categoriesCollection.get();
+    return snapshot.docs.map((doc) => 
+      Category.fromJson(doc.data() as Map<String, dynamic>)
+    ).toList();
   }
 
   // Add a new transaction
   Future<Transaction> addTransaction(Transaction transaction) async {
-    final transactions = await getTransactions();
-    transactions.add(transaction);
-    await saveData(_transactionsKey, transactions);
+    await _transactionsCollection.doc(transaction.id).set(transaction.toJson());
     return transaction;
   }
 
   // Delete a transaction
   Future<void> deleteTransaction(String id) async {
-    final transactions = await getTransactions();
-    final updatedTransactions = transactions.where((t) => t.id != id).toList();
-    await saveData(_transactionsKey, updatedTransactions);
+    await _transactionsCollection.doc(id).delete();
   }
 
   // Add a new category
   Future<Category> addCategory(Category category) async {
-    final categories = await getCategories();
-    categories.add(category);
-    await saveData(_categoriesKey, categories);
+    await _categoriesCollection.doc(category.id).set(category.toJson());
     return category;
   }
 
   // Update a category
   Future<Category> updateCategory(Category updatedCategory) async {
-    final categories = await getCategories();
-    final updatedCategories = categories.map((category) => 
-      category.id == updatedCategory.id ? updatedCategory : category
-    ).toList();
-    
-    await saveData(_categoriesKey, updatedCategories);
+    await _categoriesCollection.doc(updatedCategory.id).set(updatedCategory.toJson());
     return updatedCategory;
   }
 
   // Delete a category
   Future<void> deleteCategory(String id) async {
-    final categories = await getCategories();
-    final updatedCategories = categories.where((c) => c.id != id).toList();
-    await saveData(_categoriesKey, updatedCategories);
+    // Delete the category
+    await _categoriesCollection.doc(id).delete();
     
-    // Also remove any transactions with this category
-    final transactions = await getTransactions();
-    final updatedTransactions = transactions.where((t) => t.categoryId != id).toList();
-    await saveData(_transactionsKey, updatedTransactions);
+    // Find and delete all transactions with this category
+    final snapshot = await _transactionsCollection
+        .where('categoryId', isEqualTo: id)
+        .get();
+    
+    final batch = _firestore.batch();
+    for (var doc in snapshot.docs) {
+      batch.delete(doc.reference);
+    }
+    
+    await batch.commit();
   }
 
   // Get transaction summary
